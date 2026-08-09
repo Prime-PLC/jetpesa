@@ -161,6 +161,10 @@ Recommended deployment:
 - Render
 - VPS
 
+## Continuous Integration
+
+GitHub Actions installs the locked dependencies and runs a production build for every pull request and every push to `main`. The build uses generated placeholder Firebase credentials; production credentials must only be configured in the deployment platform.
+
 ---
 
 # Features
