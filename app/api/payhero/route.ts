@@ -12,10 +12,12 @@ async function getDarajaToken() {
 
   const res = await fetch(
     'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-    { headers: { Authorization: `Basic ${auth}` } }
+    { headers: { Authorization: `Basic ${auth}` }, cache: 'no-store' }
   );
 
-  const data = await res.json();
+  if (!res.ok) return null;
+
+  const data = await res.json() as { access_token?: string };
   return data.access_token || null;
 }
 
@@ -33,9 +35,31 @@ function normalizePhone(phone: unknown) {
 }
 
 function getBaseUrl(request: NextRequest) {
-  const host = request.headers.get('host');
-  const proto = host?.includes('localhost') ? 'http' : 'https';
+  const configuredUrl = process.env.MPESA_CALLBACK_BASE_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (configuredUrl) return configuredUrl.replace(/\/$/, '');
+
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  if (!host) throw new Error('Payment callback URL is not configured.');
+
+  const forwardedProtocol = request.headers.get('x-forwarded-proto');
+  const proto = forwardedProtocol || (host.includes('localhost') || host.startsWith('127.') ? 'http' : 'https');
   return `${proto}://${host}`;
+}
+
+function getDarajaTimestamp() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Nairobi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}${values.month}${values.day}${values.hour}${values.minute}${values.second}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -63,61 +87,19 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
-    const usernamePH = process.env.PAYHERO_API_USERNAME;
-    const passwordPH = process.env.PAYHERO_API_PASSWORD;
-    const channelIdPH = process.env.PAYHERO_CHANNEL_ID;
-
-    if (usernamePH && passwordPH && channelIdPH) {
-      const auth = Buffer.from(`${usernamePH}:${passwordPH}`).toString('base64');
-
-      const phRes = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Basic ${auth}`,
-        },
-        body: JSON.stringify({
-          amount: amt,
-          phone_number: cleanPhone,
-          channel_id: Number(channelIdPH),
-          provider: 'm-pesa',
-          external_reference: reference,
-          callback_url: `${baseUrl}/api/payhero-callback`,
-        }),
-      });
-
-      const phData = await phRes.json();
-
-      if (phRes.ok && (phRes.status === 201 || phData.success)) {
-        await adminDb.collection('deposits').doc(reference).update({
-          provider: 'payhero',
-          providerReference: phData.reference || null,
-          providerResponse: phData,
-        });
-
-        return NextResponse.json({
-          success: true,
-          status: 'pending',
-          provider: 'payhero',
-          reference,
-          message: 'STK push sent. Complete payment on your phone.',
-        });
-      }
-    }
-
     const token = await getDarajaToken();
     if (!token) throw new Error('Failed! Token could not be generated. Please retry.');
 
-    const storeNumber = process.env.MPESA_STORE_NUMBER;
-    const tillNumber = process.env.MPESA_TILL_NUMBER;
+    const businessShortCode = process.env.MPESA_TILL_NUMBER || process.env.MPESA_STORE_NUMBER;
     const passKey = process.env.MPESA_PASSKEY;
 
-    if (!storeNumber || !tillNumber || !passKey) {
-      throw new Error('Daraja credentials are incomplete.');
+    if (!businessShortCode || !passKey) {
+      throw new Error('Daraja credentials are incomplete. Set MPESA_TILL_NUMBER and MPESA_PASSKEY.');
     }
 
-    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-    const password = Buffer.from(`${storeNumber}${passKey}${timestamp}`).toString('base64');
+    const timestamp = getDarajaTimestamp();
+    const password = Buffer.from(`${businessShortCode}${passKey}${timestamp}`).toString('base64');
+    const callbackUrl = `${baseUrl}/api/daraja-callback`;
 
     const darajaRes = await fetch(
       'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
@@ -128,24 +110,30 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          BusinessShortCode: storeNumber,
+          BusinessShortCode: businessShortCode,
           Password: password,
           Timestamp: timestamp,
           TransactionType: 'CustomerBuyGoodsOnline',
           Amount: amt,
           PartyA: cleanPhone,
-          PartyB: tillNumber,
+          PartyB: businessShortCode,
           PhoneNumber: cleanPhone,
-          CallBackURL: `${baseUrl}/api/daraja-callback`,
+          CallBackURL: callbackUrl,
           AccountReference: reference,
           TransactionDesc: 'JetPesa Wallet TopUp',
         }),
       }
     );
 
-    const darajaData = await darajaRes.json();
+    const darajaData = await darajaRes.json() as {
+      ResponseCode?: string;
+      ResponseDescription?: string;
+      errorMessage?: string;
+      CheckoutRequestID?: string;
+      MerchantRequestID?: string;
+    };
 
-    if (darajaData.ResponseCode !== '0') {
+    if (!darajaRes.ok || darajaData.ResponseCode !== '0') {
       throw new Error(
         darajaData.errorMessage ||
         darajaData.ResponseDescription ||

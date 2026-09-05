@@ -79,6 +79,7 @@ MPESA_CONSUMER_SECRET=
 MPESA_STORE_NUMBER=
 MPESA_TILL_NUMBER=
 MPESA_PASSKEY=
+MPESA_CALLBACK_BASE_URL=https://your-public-domain.example
 ```
 
 ---
@@ -146,6 +147,11 @@ JetPesa uses:
 2. Safaricom Daraja as automatic fallback
 
 Wallet balances are credited ONLY after callback confirmation.
+
+For a direct Daraja buy-goods STK push, set `MPESA_TILL_NUMBER` to the shortcode used by
+the till and set `MPESA_PASSKEY` for that shortcode. `MPESA_CALLBACK_BASE_URL` must be a
+public HTTPS URL that points to this deployment; Safaricom cannot deliver callbacks to
+`localhost`. The callback endpoint is `/api/daraja-callback`.
 
 This prevents fake deposits and premature wallet funding.
 
