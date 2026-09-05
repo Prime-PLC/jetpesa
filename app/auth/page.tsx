@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, isDemoMode } from '../../firebaseConfig';
+import { auth, db, isDemoMode, missingFirebaseConfig } from '../../firebaseConfig';
 import { ThemeSelector } from '../ThemeProvider';
 import styles from './auth.module.css';
 import { getErrorMessage } from '../../lib/errors';
@@ -22,6 +22,10 @@ function AuthForm() {
   const [phone, setPhone] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    router.prefetch('/dashboard');
+  }, [router]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -45,25 +49,23 @@ function AuthForm() {
     setLoading(true);
     try {
       if (isDemoMode) throw new Error('Google sign-in is unavailable in demo mode.');
-      if (!auth || !db) throw new Error('Authentication is not configured for this environment.');
+      if (!auth || !db) {
+        throw new Error(`Firebase is not configured. Add ${missingFirebaseConfig.join(', ')} to .env.local, set NEXT_PUBLIC_DEMO_MODE=false, then restart the dev server.`);
+      }
 
       const credential = await signInWithPopup(auth, new GoogleAuthProvider());
       const userRef = doc(db, 'users', credential.user.uid);
       try {
-        const userSnapshot = await getDoc(userRef);
-
-        if (!userSnapshot.exists()) {
-          await setDoc(userRef, {
-            uid: credential.user.uid,
-            email: credential.user.email || '',
-            displayName: credential.user.displayName || '',
-            mpesaPhone: '',
-            walletBalance: 0,
-            createdAt: new Date().toISOString(),
-          });
-        }
+        await setDoc(userRef, {
+          uid: credential.user.uid,
+          email: credential.user.email || '',
+          displayName: credential.user.displayName || '',
+          mpesaPhone: '',
+          walletBalance: 0,
+          createdAt: new Date().toISOString(),
+        }, { merge: true });
       } catch (firestoreError) {
-        console.warn('Google authentication succeeded, but the Firestore profile could not be loaded.', firestoreError);
+        console.warn('Google authentication succeeded, but the Firestore profile could not be saved yet.', firestoreError);
       }
 
       router.replace('/dashboard');
@@ -88,7 +90,9 @@ function AuthForm() {
         router.replace('/dashboard');
         return;
       }
-      if (!auth || !db) throw new Error('Authentication is not configured for this environment.');
+      if (!auth || !db) {
+        throw new Error(`Firebase is not configured. Add ${missingFirebaseConfig.join(', ')} to .env.local, set NEXT_PUBLIC_DEMO_MODE=false, then restart the dev server.`);
+      }
       if (activeTab === 'login') {
         let finalEmail = loginIdentifier.trim();
         if (!finalEmail.includes('@')) finalEmail = await resolveEmailFromPhone(finalEmail);

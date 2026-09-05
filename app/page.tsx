@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ThemeSelector } from './ThemeProvider';
 import styles from './page.module.css';
 
@@ -26,8 +27,14 @@ function DeviceIcon() {
 }
 
 export default function JetPesaLandingPage() {
+  const router = useRouter();
   const [multiplier, setMultiplier] = useState(1);
   const [phase, setPhase] = useState('Open for bets');
+
+  useEffect(() => {
+    router.prefetch('/auth?tab=login');
+    router.prefetch('/auth?tab=signup');
+  }, [router]);
 
   useEffect(() => {
     const startedAt = Date.now();
