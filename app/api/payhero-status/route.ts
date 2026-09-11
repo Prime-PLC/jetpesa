@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '../../../lib/firebaseAdmin';
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
+  if (!adminDb) { return NextResponse.json({ success: false, status: 'disabled', message: 'This integration is not configured.' }, { status: 503 }); }
   const { searchParams } = new URL(request.url);
   const reference = searchParams.get('reference');
 

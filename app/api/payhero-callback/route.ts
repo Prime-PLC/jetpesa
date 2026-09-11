@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, FieldValue } from '../../../lib/firebaseAdmin';
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
+  if (!adminDb) { return NextResponse.json({ success: false, status: 'disabled', message: 'This integration is not configured.' }, { status: 503 }); }
+  const database = adminDb;
   const body = await request.json();
 
   const reference =
@@ -29,6 +31,7 @@ export async function POST(request) {
   }
 
   const tx = snap.data();
+  if (!tx) return NextResponse.json({ received: true, message: 'Transaction data is missing.' });
 
   const paid =
     status.includes('success') ||
@@ -47,7 +50,7 @@ export async function POST(request) {
   }
 
   if (!tx.credited) {
-    await adminDb.runTransaction(async (transaction) => {
+    await database.runTransaction(async (transaction) => {
       transaction.update(docRef, {
         status: 'completed',
         credited: true,
@@ -55,7 +58,7 @@ export async function POST(request) {
         updatedAt: new Date().toISOString(),
       });
 
-      transaction.update(adminDb.collection('users').doc(tx.userId), {
+      transaction.update(database.collection('users').doc(tx.userId), {
         walletBalance: FieldValue.increment(tx.amount),
       });
     });

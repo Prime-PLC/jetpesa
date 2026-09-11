@@ -1,19 +1,20 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { getErrorMessage } from '../../../../lib/errors';
 
 export const dynamic = 'force-dynamic';
 
 const HOUSE_EDGE = 0.03;
 
-function sha256(value) {
+function sha256(value: string) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-function hmacSha256(secret, message) {
+function hmacSha256(secret: string, message: string) {
   return crypto.createHmac('sha256', secret).update(message).digest('hex');
 }
 
-function normalizeNonce(value) {
+function normalizeNonce(value: string) {
   const nonce = Number(value);
 
   if (!Number.isInteger(nonce) || nonce < 1) {
@@ -23,7 +24,7 @@ function normalizeNonce(value) {
   return nonce;
 }
 
-function calculateCrashPoint(hash) {
+function calculateCrashPoint(hash: string) {
   // First 52 bits from hash.
   const hex52 = hash.slice(0, 13);
   const h = BigInt(`0x${hex52}`);
@@ -42,13 +43,14 @@ function calculateCrashPoint(hash) {
   return Math.max(1.0, Math.floor(result * 100) / 100);
 }
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
     const nonce = normalizeNonce(searchParams.get('nonce') || '1');
 
-    const serverSeed = process.env.GAME_SERVER_SEED;
+    const serverSeed = process.env.GAME_SERVER_SEED ||
+      (process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'jetpesa-demo-seed-not-for-production' : null);
     const clientSeed =
       searchParams.get('clientSeed') ||
       process.env.GAME_CLIENT_SEED ||
@@ -84,7 +86,7 @@ export async function GET(request) {
     return NextResponse.json(
       {
         success: false,
-        message: error.message,
+        message: getErrorMessage(error),
       },
       { status: 400 }
     );
