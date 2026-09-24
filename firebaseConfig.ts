@@ -14,6 +14,11 @@ const firebaseConfig = {
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId
 );
+export const missingFirebaseConfig = [
+  ['NEXT_PUBLIC_FIREBASE_API_KEY', firebaseConfig.apiKey],
+  ['NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', firebaseConfig.authDomain],
+  ['NEXT_PUBLIC_FIREBASE_PROJECT_ID', firebaseConfig.projectId],
+].filter(([, value]) => !value).map(([name]) => name);
 export const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 const app = isFirebaseConfigured

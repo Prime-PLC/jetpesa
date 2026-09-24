@@ -3,9 +3,9 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, isDemoMode } from '../../firebaseConfig';
+import { auth, db, isDemoMode, missingFirebaseConfig } from '../../firebaseConfig';
 import { ThemeSelector } from '../ThemeProvider';
 import styles from './auth.module.css';
 import { getErrorMessage } from '../../lib/errors';
@@ -24,6 +24,10 @@ function AuthForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    router.prefetch('/dashboard');
+  }, [router]);
+
+  useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab === 'signup' || tab === 'login') setActiveTab(tab);
   }, [searchParams]);
@@ -38,6 +42,37 @@ function AuthForm() {
     const resolvedEmail = snap.data().email;
     if (typeof resolvedEmail !== 'string') throw new Error('This account has no valid email address.');
     return resolvedEmail;
+  };
+
+  const handleGoogleAuth = async () => {
+    setErrorMsg('');
+    setLoading(true);
+    try {
+      if (isDemoMode) throw new Error('Google sign-in is unavailable in demo mode.');
+      if (!auth || !db) {
+        throw new Error(`Firebase is not configured. Add ${missingFirebaseConfig.join(', ')} to .env.local, set NEXT_PUBLIC_DEMO_MODE=false, then restart the dev server.`);
+      }
+
+      const credential = await signInWithPopup(auth, new GoogleAuthProvider());
+      const userRef = doc(db, 'users', credential.user.uid);
+      try {
+        await setDoc(userRef, {
+          uid: credential.user.uid,
+          email: credential.user.email || '',
+          displayName: credential.user.displayName || '',
+          mpesaPhone: '',
+          walletBalance: 0,
+          createdAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (firestoreError) {
+        console.warn('Google authentication succeeded, but the Firestore profile could not be saved yet.', firestoreError);
+      }
+
+      router.replace('/dashboard');
+    } catch (error) {
+      setErrorMsg(getErrorMessage(error).replace('Firebase:', '').trim());
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -55,7 +90,9 @@ function AuthForm() {
         router.replace('/dashboard');
         return;
       }
-      if (!auth || !db) throw new Error('Authentication is not configured for this environment.');
+      if (!auth || !db) {
+        throw new Error(`Firebase is not configured. Add ${missingFirebaseConfig.join(', ')} to .env.local, set NEXT_PUBLIC_DEMO_MODE=false, then restart the dev server.`);
+      }
       if (activeTab === 'login') {
         let finalEmail = loginIdentifier.trim();
         if (!finalEmail.includes('@')) finalEmail = await resolveEmailFromPhone(finalEmail);
@@ -103,6 +140,16 @@ function AuthForm() {
             <button type="button" role="tab" aria-selected={activeTab === 'signup'} onClick={() => selectTab('signup')}>Create account</button>
           </div>
           {errorMsg && <div className={styles.error} role="alert">{errorMsg}</div>}
+          <button className={styles.googleButton} type="button" disabled={loading} onClick={handleGoogleAuth}>
+            <svg className={styles.googleIcon} aria-hidden="true" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M21.35 12.23c0-.77-.07-1.52-.22-2.23H12v4.22h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.38Z" />
+              <path fill="#34A853" d="M12 21.99c2.63 0 4.84-.87 6.45-2.38l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.74 9.74 0 0 0 12 21.99Z" />
+              <path fill="#FBBC05" d="M6.54 14.05a5.86 5.86 0 0 1 0-3.73V7.79H3.3a9.99 9.99 0 0 0 0 8.79l3.24-2.53Z" />
+              <path fill="#EA4335" d="M12 6.29c1.43 0 2.71.49 3.72 1.46l2.79-2.79C16.83 3.35 14.63 2.01 12 2.01a9.74 9.74 0 0 0-8.7 5.78l3.24 2.53C7.31 8.01 9.46 6.29 12 6.29Z" />
+            </svg>
+            Continue with Google
+          </button>
+          <div className={styles.divider}><span>or continue with email</span></div>
           <form onSubmit={handleSubmit} className={styles.form}>
             {activeTab === 'login' ? (
               <label>Email or phone<input type="text" autoComplete="username" required disabled={loading} placeholder="Email or 07XXXXXXXX" value={loginIdentifier} onChange={(e) => setLoginIdentifier(e.target.value)} /></label>

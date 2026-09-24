@@ -21,6 +21,10 @@ const HISTORY_STORAGE_KEY = 'jetpesa_real_previous_rounds';
 export default function UltimateJetPesaCockpit() {
   const router = useRouter();
 
+  useEffect(() => {
+    router.prefetch('/auth');
+  }, [router]);
+
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [balance, setBalance] = useState(0.0);
   const [phoneProfile, setPhoneProfile] = useState('');
@@ -68,16 +72,7 @@ export default function UltimateJetPesaCockpit() {
   const [multiplier, setMultiplier] = useState(1.0);
   const [gameStatus, setGameStatus] = useState<GameStatus>('idle');
   const [countdownProgress, setCountdownProgress] = useState(100);
-  const [historyTape, setHistoryTape] = useState<number[]>(() => {
-    if (typeof window === 'undefined') return [];
-
-    try {
-      const saved = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]');
-      return Array.isArray(saved) ? saved.map(Number).filter(Boolean).slice(0, 14) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [historyTape, setHistoryTape] = useState<number[]>([]);
 
   const [activePlayersCount, setActivePlayersCount] = useState(3412);
   const [liveBetsFeed, setLiveBetsFeed] = useState<LiveBet[]>([]);
@@ -97,6 +92,13 @@ export default function UltimateJetPesaCockpit() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const planeImageRef = useRef<HTMLImageElement | null>(null);
+  const balanceRef = useRef(balance);
+  const deckARef = useRef(deckA);
+  const deckBRef = useRef(deckB);
+  const gameStatusRef = useRef(gameStatus);
+  const audioMutedRef = useRef(audioMuted);
+  const rainActiveRef = useRef(isRainActive);
+  const userRef = useRef(user);
   const lastCycleRef = useRef<number | null>(null);
   const recordedCrashCycleRef = useRef<number | null>(null);
   const betNonceRef = useRef(1);
@@ -112,6 +114,14 @@ export default function UltimateJetPesaCockpit() {
     serverSeed: '',
     houseEdge: 0.01,
   });
+
+  balanceRef.current = balance;
+  deckARef.current = deckA;
+  deckBRef.current = deckB;
+  gameStatusRef.current = gameStatus;
+  audioMutedRef.current = audioMuted;
+  rainActiveRef.current = isRainActive;
+  userRef.current = user;
 
   useEffect(() => {
     const svgPlane = `
@@ -156,7 +166,7 @@ export default function UltimateJetPesaCockpit() {
   };
 
   const playSynthesizedTone = (freq: number, type: OscillatorType, duration: number, volume = 0.03) => {
-    if (audioMuted) return;
+    if (audioMutedRef.current) return;
 
     try {
       if (!audioCtxRef.current) {
@@ -376,6 +386,15 @@ export default function UltimateJetPesaCockpit() {
   };
 
   useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]');
+      if (Array.isArray(saved)) {
+        setHistoryTape(saved.map(Number).filter(Boolean).slice(0, 14));
+      }
+    } catch {
+      setHistoryTape([]);
+    }
+
     const savedPhone = localStorage.getItem('jetpesa_saved_phone');
 
     if (savedPhone) {
@@ -409,20 +428,26 @@ export default function UltimateJetPesaCockpit() {
 
       setUser(curr);
 
-      const userDoc = await getDoc(doc(database, 'users', curr.uid));
+      try {
+        const userDoc = await getDoc(doc(database, 'users', curr.uid));
 
-      if (userDoc.exists()) {
-        const d = userDoc.data();
+        if (userDoc.exists()) {
+          const d = userDoc.data();
 
-        setBalance(d.walletBalance || 0.0);
-        setProfileName(d.displayName || '');
-        setEditName(d.displayName || '');
+          setBalance(d.walletBalance || 0.0);
+          setProfileName(d.displayName || curr.displayName || '');
+          setEditName(d.displayName || curr.displayName || '');
 
-        if (!savedPhone && d.mpesaPhone) {
-          setPhoneProfile(d.mpesaPhone);
-          setInputPhone(d.mpesaPhone);
-          setEditPhone(d.mpesaPhone);
+          if (!savedPhone && d.mpesaPhone) {
+            setPhoneProfile(d.mpesaPhone);
+            setInputPhone(d.mpesaPhone);
+            setEditPhone(d.mpesaPhone);
+          }
         }
+      } catch (firestoreError) {
+        console.warn('Signed in, but the Firebase profile is temporarily unavailable.', firestoreError);
+        setProfileName(curr.displayName || '');
+        setEditName(curr.displayName || '');
       }
     });
 
@@ -477,17 +502,20 @@ export default function UltimateJetPesaCockpit() {
       if (lastCycleRef.current !== cycleIndex) {
         lastCycleRef.current = cycleIndex;
         const nextNonce = cycleIndex + 1;
-        let nextBalance = balance;
+        let nextBalance = balanceRef.current;
         let activatedQueuedBet = false;
 
-        if (deckA.hasBetNext && !deckA.hasBetCurrent && nextBalance >= Number(deckA.wager)) {
-          nextBalance -= Number(deckA.wager);
+        const currentDeckA = deckARef.current;
+        const currentDeckB = deckBRef.current;
+
+        if (currentDeckA.hasBetNext && !currentDeckA.hasBetCurrent && nextBalance >= Number(currentDeckA.wager)) {
+          nextBalance -= Number(currentDeckA.wager);
           activatedQueuedBet = true;
           setDeckA((prev) => ({ ...prev, hasBetCurrent: true, hasBetNext: prev.isAuto }));
         }
 
-        if (deckB.hasBetNext && !deckB.hasBetCurrent && nextBalance >= Number(deckB.wager)) {
-          nextBalance -= Number(deckB.wager);
+        if (currentDeckB.hasBetNext && !currentDeckB.hasBetCurrent && nextBalance >= Number(currentDeckB.wager)) {
+          nextBalance -= Number(currentDeckB.wager);
           activatedQueuedBet = true;
           setDeckB((prev) => ({ ...prev, hasBetCurrent: true, hasBetNext: prev.isAuto }));
         }
@@ -504,7 +532,7 @@ export default function UltimateJetPesaCockpit() {
       const crashPoint = currentRoundRef.current.crashPoint || 2;
 
       if (offsetMs < countdownInterval) {
-        if (gameStatus !== 'idle') {
+        if (gameStatusRef.current !== 'idle') {
           setGameStatus('idle');
           setMultiplier(1.0);
           playSynthesizedTone(440, 'triangle', 0.05, 0.03);
@@ -568,10 +596,10 @@ export default function UltimateJetPesaCockpit() {
 
     animationId.current = requestAnimationFrame(runDistributedClockLoop);
     return () => { if (animationId.current !== null) cancelAnimationFrame(animationId.current); };
-  }, [deckA, deckB, gameStatus, balance, audioMuted, isRainActive]);
+  }, []);
 
   const drawRain = (ctx: CanvasRenderingContext2D, W: number, H: number, secondsInAir: number) => {
-    if (!isRainActive) return;
+    if (!rainActiveRef.current) return;
 
     ctx.save();
     ctx.strokeStyle = 'rgba(125, 211, 252, 0.34)';
@@ -621,7 +649,7 @@ export default function UltimateJetPesaCockpit() {
       ctx.stroke();
     }
 
-    if (offsetMs >= countdownLimit && gameStatus === 'running') {
+    if (offsetMs >= countdownLimit && gameStatusRef.current === 'running') {
       const secondsInAir = (offsetMs - countdownLimit) / 1000;
 
       drawRain(ctx, W, H, secondsInAir);
@@ -717,12 +745,13 @@ export default function UltimateJetPesaCockpit() {
   };
 
   const commitWalletBalance = async (balTarget: number) => {
-    if (!user) return;
+    const currentUser = userRef.current;
+    if (!currentUser) return;
 
     if (isDemoMode) { localStorage.setItem('jetpesa_demo_balance', balTarget.toFixed(2)); return; }
 
     if (!db) throw new Error('Wallet storage is not configured.');
-    await updateDoc(doc(db, 'users', user.uid), {
+    await updateDoc(doc(db, 'users', currentUser.uid), {
       walletBalance: parseFloat(balTarget.toFixed(2)),
     });
   };
