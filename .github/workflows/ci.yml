@@ -48,5 +48,8 @@ jobs:
           openssl genrsa 2048 >> "$GITHUB_ENV"
           echo 'CI_FIREBASE_KEY' >> "$GITHUB_ENV"
 
+      - name: Check TypeScript
+        run: npm run type-check
+
       - name: Build application
         run: npm run build

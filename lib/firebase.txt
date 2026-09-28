@@ -1,0 +1,85 @@
+JETPESA FIREBASE SETUP
+=======================
+
+1. Create Firebase project
+--------------------------
+- Open https://console.firebase.google.com/
+- Create or select the JetPesa project.
+- Go to Project settings and add a Web app.
+- Copy the Web app configuration into .env.local.
+
+2. Enable Authentication
+------------------------
+Firebase Console -> Authentication -> Sign-in method:
+
+- Enable Email/Password.
+- Enable Google.
+- Set the project support email when prompted.
+- Add localhost and the production domain under Authentication -> Settings -> Authorized domains.
+
+For local development, ensure localhost is authorized.
+For production, add the exact domain used by the deployed app.
+
+3. Configure Firestore
+----------------------
+- Firebase Console -> Firestore Database -> Create database.
+- Use Native mode.
+- Deploy the rules from firestore.rules.
+
+Collections used by this project:
+- users/{uid}
+- phoneLookup/{phone}
+- deposits/{depositId}
+
+Important:
+The browser signup flow writes to phoneLookup. The current firestore.rules file denies
+client writes to phoneLookup, so email/phone signup will require a server-side lookup
+endpoint or a deliberately restricted rule before it can work in production.
+
+4. Client environment variables
+-------------------------------
+Create .env.local in the project root:
+
+NEXT_PUBLIC_FIREBASE_API_KEY=your-web-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-storage-bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-web-app-id
+NEXT_PUBLIC_DEMO_MODE=false
+
+Get these values from:
+Firebase Console -> Project settings -> Your apps -> Web app.
+
+5. Firebase Admin environment variables
+----------------------------------------
+Firebase Console -> Project settings -> Service accounts -> Generate new private key.
+
+Use the service-account values on the server/deployment platform only:
+
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_KEY\n-----END PRIVATE KEY-----\n"
+
+Never use NEXT_PUBLIC_ for Admin credentials.
+Never commit the service-account JSON file or private key.
+
+6. Google sign-in offline error
+-------------------------------
+If Google login shows "Failed to get document because the client is offline":
+
+- Confirm NEXT_PUBLIC_FIREBASE_API_KEY, AUTH_DOMAIN, and PROJECT_ID are correct.
+- Confirm the browser has internet access.
+- Confirm the Firebase project is not blocked by an ad blocker, VPN, firewall, or proxy.
+- Confirm the app's current host is listed in Authentication -> Settings -> Authorized domains.
+- Confirm Firestore has been created in the same Firebase project.
+- Check the browser console for blocked requests to firebaseio.com or googleapis.com.
+- Restart the Next.js server after changing .env.local.
+
+7. Deploying
+------------
+Add the same client variables and server-only Admin variables to the deployment platform.
+After changing environment variables, redeploy the application.
+
+Payment callbacks also require a public HTTPS deployment URL; Firebase configuration alone
+does not configure M-Pesa or PayHero.

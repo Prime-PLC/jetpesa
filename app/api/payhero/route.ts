@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
-import { adminDb, FieldValue } from '../../../lib/firebaseAdmin';
+import { NextRequest, NextResponse } from 'next/server';
+import { adminDb } from '../../../lib/firebaseAdmin';
+import { getErrorMessage } from '../../../lib/errors';
 
 async function getDarajaToken() {
   const key = process.env.MPESA_CONSUMER_KEY;
@@ -18,7 +19,7 @@ async function getDarajaToken() {
   return data.access_token || null;
 }
 
-function normalizePhone(phone) {
+function normalizePhone(phone: unknown) {
   let clean = String(phone || '').trim().replace(/\s+/g, '');
 
   if (clean.startsWith('+')) clean = clean.slice(1);
@@ -31,13 +32,14 @@ function normalizePhone(phone) {
   return clean;
 }
 
-function getBaseUrl(request) {
+function getBaseUrl(request: NextRequest) {
   const host = request.headers.get('host');
   const proto = host?.includes('localhost') ? 'http' : 'https';
   return `${proto}://${host}`;
 }
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
+  if (!adminDb) { return NextResponse.json({ success: false, status: 'disabled', message: 'This integration is not configured.' }, { status: 503 }); }
   try {
     const { amount, phone, username } = await request.json();
 
@@ -171,7 +173,7 @@ export async function POST(request) {
       {
         success: false,
         status: 'failed',
-        message: error.message,
+        message: getErrorMessage(error),
       },
       { status: 400 }
     );

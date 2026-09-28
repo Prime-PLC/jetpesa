@@ -165,6 +165,38 @@ Recommended deployment:
 
 GitHub Actions installs the locked dependencies and runs a production build for every pull request and every push to `main`. The build uses generated placeholder Firebase credentials; production credentials must only be configured in the deployment platform.
 
+## Demo Deployment
+
+JetPesa has an explicit, no-secrets demo mode for stakeholder review. Demo mode uses a local browser-only session and simulated wallet balance. It never calls M-Pesa, PayHero, Firebase Authentication, or Firestore for wallet updates.
+
+1. Copy `.env.example` to `.env.local`.
+2. Keep `NEXT_PUBLIC_DEMO_MODE=true`.
+3. Run `npm ci`, then `npm run dev`.
+4. Open `/auth`, submit either form, and continue to `/dashboard`.
+
+For Vercel, set only `NEXT_PUBLIC_DEMO_MODE=true` for the demo project. Use a separate project and separate secrets for staging or production. Never enable demo mode in a real-money deployment.
+
+### Demo safety boundary
+
+- A persistent banner identifies simulated funds and gameplay.
+- Demo balances and sessions live only in browser local storage.
+- Payment and callback routes return HTTP 503 when Firebase Admin is not configured.
+- The fairness endpoint uses a public demo seed only when demo mode is explicitly enabled.
+- Missing credentials do not automatically enable demo mode.
+
+### Production gate
+
+The current release is suitable for a product demo, not real-money wagering. Before production, replace client-driven betting, wallet, withdrawal, player, and chat behavior with authenticated server-authoritative services. Verify Firebase ID tokens on every protected API request, validate signed payment callbacks, add idempotency and rate limiting, deploy and test `firestore.rules`, complete legal/compliance review, add monitoring/backups, and run M-Pesa sandbox acceptance tests.
+
+### Verification
+
+```bash
+npm ci
+npm run build
+npm audit --omit=dev
+```
+
+CI runs the production build on pushes and pull requests. Production promotion should remain manual until payment callbacks, rollback, monitoring, and backups have been validated in staging.
 ---
 
 # Features
