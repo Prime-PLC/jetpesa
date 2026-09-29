@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '../../../lib/firebaseAdmin';
+import { adminAuth, adminDb } from '../../../lib/firebaseAdmin';
+import { MIN_DEPOSIT } from '../../../lib/businessRules';
 import { getErrorMessage } from '../../../lib/errors';
+type MpesaEnvironment = 'sandbox' | 'production';
+
+function getMpesaEnvironment(): MpesaEnvironment {
+  return process.env.MPESA_ENV === 'production' ? 'production' : 'sandbox';
+}
+
+function getDarajaBaseUrl() {
+  return getMpesaEnvironment() === 'production'
+    ? 'https://api.safaricom.co.ke'
+    : 'https://sandbox.safaricom.co.ke';
+}
 
 async function getDarajaToken() {
   const key = process.env.MPESA_CONSUMER_KEY;
@@ -11,7 +23,7 @@ async function getDarajaToken() {
   const auth = Buffer.from(`${key}:${secret}`).toString('base64');
 
   const res = await fetch(
-    'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+    `${getDarajaBaseUrl()}/oauth/v1/generate?grant_type=client_credentials`,
     { headers: { Authorization: `Basic ${auth}` } }
   );
 
@@ -32,29 +44,36 @@ function normalizePhone(phone: unknown) {
   return clean;
 }
 
-function getBaseUrl(request: NextRequest) {
-  const host = request.headers.get('host');
-  const proto = host?.includes('localhost') ? 'http' : 'https';
-  return `${proto}://${host}`;
+function getCallbackBaseUrl() {
+  const value = String(process.env.PAYMENT_CALLBACK_BASE_URL || '').replace(/\/$/, '');
+  if (!value || !value.startsWith('https://') || value.includes('localhost')) {
+    throw new Error('PAYMENT_CALLBACK_BASE_URL must be a public HTTPS URL before payments can be initiated.');
+  }
+  return value;
 }
 
 export async function POST(request: NextRequest) {
   if (!adminDb) { return NextResponse.json({ success: false, status: 'disabled', message: 'This integration is not configured.' }, { status: 503 }); }
   try {
-    const { amount, phone, username } = await request.json();
+    const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+    if (!token || !adminAuth) {
+      return NextResponse.json({ success: false, status: 'failed', message: 'Authentication is required.' }, { status: 401 });
+    }
+    const decoded = await adminAuth.verifyIdToken(token);
+    const { amount, phone } = await request.json();
 
     const amt = Math.floor(Number(amount));
 
-    if (!username) throw new Error('Missing user ID.');
-    if (!amt || amt < 49) throw new Error('Minimum deposit is KES 49.');
+    if (!Number.isInteger(amt) || amt < MIN_DEPOSIT) throw new Error(`Minimum deposit is KES ${MIN_DEPOSIT}.`);
 
     const cleanPhone = normalizePhone(phone);
-    const baseUrl = getBaseUrl(request);
+    const mpesaEnvironment = getMpesaEnvironment();
+    const baseUrl = getCallbackBaseUrl();
     const reference = `JP-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
 
     await adminDb.collection('deposits').doc(reference).set({
       reference,
-      userId: username,
+      userId: decoded.uid,
       amount: amt,
       phone: cleanPhone,
       status: 'pending',
@@ -67,7 +86,7 @@ export async function POST(request: NextRequest) {
     const passwordPH = process.env.PAYHERO_API_PASSWORD;
     const channelIdPH = process.env.PAYHERO_CHANNEL_ID;
 
-    if (usernamePH && passwordPH && channelIdPH) {
+    if (mpesaEnvironment === 'production' && usernamePH && passwordPH && channelIdPH) {
       const auth = Buffer.from(`${usernamePH}:${passwordPH}`).toString('base64');
 
       const phRes = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
@@ -105,8 +124,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const token = await getDarajaToken();
-    if (!token) throw new Error('Failed! Token could not be generated. Please retry.');
+    const darajaToken = await getDarajaToken();
+    if (!darajaToken) throw new Error('Failed! Token could not be generated. Please retry.');
 
     const storeNumber = process.env.MPESA_STORE_NUMBER;
     const tillNumber = process.env.MPESA_TILL_NUMBER;
@@ -120,11 +139,11 @@ export async function POST(request: NextRequest) {
     const password = Buffer.from(`${storeNumber}${passKey}${timestamp}`).toString('base64');
 
     const darajaRes = await fetch(
-      'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      `${getDarajaBaseUrl()}/mpesa/stkpush/v1/processrequest`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${darajaToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -155,6 +174,7 @@ export async function POST(request: NextRequest) {
 
     await adminDb.collection('deposits').doc(reference).update({
       provider: 'daraja',
+      environment: mpesaEnvironment,
       checkoutRequestId: darajaData.CheckoutRequestID,
       merchantRequestId: darajaData.MerchantRequestID,
       providerResponse: darajaData,

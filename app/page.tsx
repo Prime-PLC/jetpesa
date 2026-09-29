@@ -4,11 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeSelector } from './ThemeProvider';
+import { BrandLogo } from './components/BrandLogo';
 import styles from './page.module.css';
 
-function BrandMark() {
-  return <span className={styles.brandMark} aria-hidden="true">JP</span>;
-}
 
 function ArrowIcon() {
   return <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
@@ -57,31 +55,31 @@ export default function JetPesaLandingPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/" className={styles.brand} aria-label="JetPesa home"><BrandMark /><span>JetPesa</span></Link>
+        <Link href="/" className={styles.brand} aria-label="JetPesa home"><BrandLogo priority /></Link>
         <nav className={styles.nav} aria-label="Primary navigation">
           <a href="#product">Product</a><a href="#how-it-works">How it works</a><a href="#safety">Safety</a>
         </nav>
         <div className={styles.headerActions}>
           <ThemeSelector compact />
           <Link href="/auth?tab=login" className={styles.textButton}>Sign in</Link>
-          <Link href="/auth?tab=signup" className={styles.primaryButton}>Try demo</Link>
+          <Link href="/auth?tab=signup" className={styles.primaryButton}>Create account</Link>
         </div>
       </header>
 
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}>A clear, responsive crash-game demo</p>
+          <p className={styles.eyebrow}>Real-time multiplier gaming</p>
           <h1>Fast rounds.<br />Clear decisions.</h1>
           <p className={styles.lead}>A focused Aviator-style experience with two betting decks, transparent round history, wallet controls, and a layout designed for phones first.</p>
           <div className={styles.heroActions}>
-            <Link href="/auth?tab=signup" className={styles.primaryButtonLarge}>Open the demo <ArrowIcon /></Link>
+            <Link href="/auth?tab=signup" className={styles.primaryButtonLarge}>Create account <ArrowIcon /></Link>
             <a href="#how-it-works" className={styles.secondaryButton}>See how it works</a>
           </div>
-          <p className={styles.demoNote}>Demo environment · Simulated balance · No real-money transaction</p>
+          <p className={styles.demoNote}>18+ only · Gambling involves financial risk · Play responsibly</p>
         </div>
 
         <div className={styles.productFrame} id="product" aria-label="JetPesa game preview">
-          <div className={styles.previewTopbar}><div><span className={styles.statusDot} /><span>{phase}</span></div><span>Demo balance&nbsp; KES 1,000.00</span></div>
+          <div className={styles.previewTopbar}><div><span className={styles.statusDot} /><span>{phase}</span></div><span>Wallet preview&nbsp; KES 1,000.00</span></div>
           <div className={styles.roundHistory}>{['1.43x','2.94x','2.00x','2.27x','1.00x','8.44x'].map((value, index) => <span key={value + index} className={index === 5 ? styles.historyHigh : ''}>{value}</span>)}</div>
           <div className={styles.gameArea}>
             <div className={styles.gameGrid} aria-hidden="true" />
@@ -94,7 +92,7 @@ export default function JetPesaLandingPage() {
         </div>
       </section>
 
-      <section className={styles.proofStrip} aria-label="Product qualities"><span>Mobile-first controls</span><span>Clear round states</span><span>Explicit demo boundaries</span><span>System-aware theme</span></section>
+      <section className={styles.proofStrip} aria-label="Product qualities"><span>Mobile-first controls</span><span>Clear round states</span><span>Provably fair rounds</span><span>System-aware theme</span></section>
 
       <section className={styles.section} id="how-it-works">
         <div className={styles.sectionIntro}><p className={styles.eyebrow}>How it works</p><h2>Everything needed for a confident round.</h2><p>Core actions stay visible and predictable from stake selection through cash out.</p></div>
@@ -104,17 +102,17 @@ export default function JetPesaLandingPage() {
       </section>
 
       <section className={styles.section} id="safety">
-        <div className={styles.sectionIntro}><p className={styles.eyebrow}>Designed with boundaries</p><h2>A demo that says exactly what it is.</h2></div>
+        <div className={styles.sectionIntro}><p className={styles.eyebrow}>Designed with boundaries</p><h2>Clear rules. Verifiable outcomes.</h2></div>
         <div className={styles.features}>
-          <article><ShieldIcon /><h3>Transparent demo mode</h3><p>Simulated funds and gameplay are identified throughout the experience.</p></article>
+          <article><ShieldIcon /><h3>Published fairness</h3><p>Every round includes cryptographic details that can be independently checked.</p></article>
           <article><WalletIcon /><h3>Focused wallet actions</h3><p>Balance, deposit, withdrawal, and account actions use a consistent hierarchy.</p></article>
           <article><DeviceIcon /><h3>Built for every screen</h3><p>Responsive layouts, accessible controls, reduced motion, and system-aware themes.</p></article>
         </div>
       </section>
 
-      <section className={styles.ctaPanel}><div><p className={styles.eyebrow}>Ready to review</p><h2>Explore the complete JetPesa demo.</h2><p>No payment credentials are required.</p></div><Link href="/auth?tab=signup" className={styles.primaryButtonLarge}>Launch demo <ArrowIcon /></Link></section>
+      <section className={styles.ctaPanel}><div><p className={styles.eyebrow}>Ready to play</p><h2>Create your JetPesa account.</h2><p>Review the rules, limits, and risks before placing a wager.</p></div><Link href="/auth?tab=signup" className={styles.primaryButtonLarge}>Create account <ArrowIcon /></Link></section>
 
-      <footer className={styles.footer}><Link href="/" className={styles.brand}><BrandMark /><span>JetPesa</span></Link><p>Demo values are simulated. Play responsibly. 18+</p><ThemeSelector compact /></footer>
+      <footer className={styles.footer}><Link href="/" className={styles.brand} aria-label="JetPesa home"><BrandLogo compact /></Link><div className={styles.legalLinks}><Link href="/terms">Terms</Link><Link href="/privacy">Privacy</Link></div><p>Gambling involves financial risk. Play responsibly. 18+</p><ThemeSelector compact /></footer>
     </main>
   );
 }

@@ -28,13 +28,11 @@ For production, add the exact domain used by the deployed app.
 
 Collections used by this project:
 - users/{uid}
-- phoneLookup/{phone}
 - deposits/{depositId}
 
-Important:
-The browser signup flow writes to phoneLookup. The current firestore.rules file denies
-client writes to phoneLookup, so email/phone signup will require a server-side lookup
-endpoint or a deliberately restricted rule before it can work in production.
+Email/password accounts sign in with their email address. The M-Pesa phone number is
+stored only on the authenticated user's private profile; it is not exposed through a
+public phone-to-email lookup collection.
 
 4. Client environment variables
 -------------------------------
