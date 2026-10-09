@@ -4,17 +4,18 @@ import { useState, useEffect, useRef, type CSSProperties, type Dispatch, type Se
 import { useRouter } from 'next/navigation';
 import { auth, db, isDemoMode } from '../../firebaseConfig';
 import { ThemeSelector } from '../ThemeProvider';
+import { BrandLogo } from '../components/BrandLogo';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import type { BetDeckState, BetHistoryItem, ChatMessage, GameStatus, LiveBet, MobilePanel, ProvablyFairRound, ToastType } from '../../types';
 import { getErrorMessage } from '../../lib/errors';
+import { HOUSE_EDGE, MAX_PAYOUT, MIN_DEPOSIT, MIN_WAGER } from '../../lib/businessRules';
 
 interface DashboardUser { uid: string; email: string | null; displayName?: string | null; mpesaPhone?: string; }
 interface ToastMessage { id: number; msg: string; type: ToastType; }
 type BetDeckName = 'A' | 'B';
 
-const MIN_WAGER = 10;
 const HISTORY_STORAGE_KEY = 'jetpesa_real_previous_rounds';
 
 
@@ -112,7 +113,7 @@ export default function UltimateJetPesaCockpit() {
     algorithm: '',
     verifyInput: '',
     serverSeed: '',
-    houseEdge: 0.01,
+    houseEdge: HOUSE_EDGE,
   });
 
   balanceRef.current = balance;
@@ -124,38 +125,8 @@ export default function UltimateJetPesaCockpit() {
   userRef.current = user;
 
   useEffect(() => {
-    const svgPlane = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 180">
-        <defs>
-          <linearGradient id="bodyRed" x1="0" x2="1">
-            <stop offset="0%" stop-color="#ff6b6b"/>
-            <stop offset="45%" stop-color="#e11d48"/>
-            <stop offset="100%" stop-color="#7f1d1d"/>
-          </linearGradient>
-          <linearGradient id="glass" x1="0" x2="1">
-            <stop offset="0%" stop-color="#dbeafe"/>
-            <stop offset="100%" stop-color="#1e293b"/>
-          </linearGradient>
-          <filter id="shadow">
-            <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.45"/>
-          </filter>
-        </defs>
-        <g filter="url(#shadow)" transform="rotate(-12 210 90)">
-          <path d="M70 98 L12 60 L110 84 Z" fill="url(#bodyRed)" stroke="#111827" stroke-width="3"/>
-          <path d="M150 104 L40 168 L290 116 Z" fill="url(#bodyRed)" stroke="#111827" stroke-width="4"/>
-          <path d="M72 82 C145 44, 270 40, 360 74 C376 80, 376 96, 360 101 C260 130, 142 125, 72 100 C50 92, 50 88, 72 82 Z" fill="url(#bodyRed)" stroke="#111827" stroke-width="4"/>
-          <path d="M112 95 C175 84, 255 84, 340 92" stroke="#ffffff" stroke-width="5" opacity="0.45" fill="none"/>
-          <path d="M160 68 C190 48, 230 50, 252 72 C222 78, 192 80, 160 68 Z" fill="url(#glass)" stroke="#111827" stroke-width="2"/>
-          <path d="M78 82 L48 28 C76 28, 98 50, 105 80 Z" fill="url(#bodyRed)" stroke="#111827" stroke-width="4"/>
-          <ellipse cx="362" cy="88" rx="22" ry="15" fill="#1e293b" stroke="#000" stroke-width="3"/>
-          <circle cx="382" cy="88" r="10" fill="#d1d5db" stroke="#111827" stroke-width="3"/>
-          <circle cx="384" cy="88" r="4" fill="#ffffff" opacity="0.8"/>
-        </g>
-      </svg>
-    `;
-
     const img = new Image();
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgPlane);
+    img.src = '/branding/jetpesa-icon.png';
     planeImageRef.current = img;
   }, []);
 
@@ -279,7 +250,7 @@ export default function UltimateJetPesaCockpit() {
     return [...new Uint8Array(signature)].map((b) => b.toString(16).padStart(2, '0')).join('');
   };
 
-  const deriveCrashPointFromHash = (hash: string, houseEdge = 0.01) => {
+  const deriveCrashPointFromHash = (hash: string, houseEdge = HOUSE_EDGE) => {
     const h = parseInt(hash.slice(0, 13), 16);
     const e = Math.pow(2, 52);
 
@@ -299,7 +270,7 @@ export default function UltimateJetPesaCockpit() {
     const verifyInput = `${clientSeed}:${nonce}`;
     const roundHash = await hmacSha256Hex(serverSeed, verifyInput);
     const serverSeedHash = await sha256Hex(serverSeed);
-    const crashPoint = deriveCrashPointFromHash(roundHash, 0.01);
+    const crashPoint = deriveCrashPointFromHash(roundHash, HOUSE_EDGE);
 
     return {
       nonce,
@@ -309,7 +280,7 @@ export default function UltimateJetPesaCockpit() {
       roundHash,
       clientSeed,
       verifyInput,
-      houseEdge: 0.01,
+      houseEdge: HOUSE_EDGE,
       algorithm: 'HMAC_SHA256(serverSeed, clientSeed:nonce), SHA256 serverSeed commitment',
     };
   };
@@ -354,7 +325,7 @@ export default function UltimateJetPesaCockpit() {
         algorithm: data.algorithm,
         verifyInput: data.verifyInput,
         serverSeed: data.serverSeed || '',
-        houseEdge: Number(data.houseEdge ?? 0.01),
+        houseEdge: Number(data.houseEdge ?? HOUSE_EDGE),
       };
 
       setProvablyData(currentRoundRef.current);
@@ -697,8 +668,8 @@ export default function UltimateJetPesaCockpit() {
         Math.min(liftFactor * 0.38, 0.26) +
         Math.sin(secondsInAir * 5) * 0.018;
 
-      const planeW = W < 520 ? 156 : 136;
-      const planeH = W < 520 ? 74 : 64;
+      const planeW = W < 520 ? 112 : 126;
+      const planeH = planeW;
 
       ctx.save();
       ctx.translate(cx + 8, cy + 13);
@@ -780,7 +751,7 @@ export default function UltimateJetPesaCockpit() {
     setMyBetsHistory([]);
     setDeckA((prev) => ({ ...prev, hasBetCurrent: false, hasBetNext: false }));
     setDeckB((prev) => ({ ...prev, hasBetCurrent: false, hasBetNext: false }));
-    triggerToast('Demo balance and local bet history reset.', 'success');
+    triggerToast('Test balance and local bet history reset.', 'success');
   };
   const handleProfileUpdate = async () => {
     if (!user) return;
@@ -814,39 +785,51 @@ export default function UltimateJetPesaCockpit() {
   };
 
   const handleWithdrawExecution = async () => {
-    const amt = parseInt(withdrawAmount);
+    const amt = Number(withdrawAmount);
 
-    if (isNaN(amt) || amt < 50) {
+    if (!Number.isInteger(amt) || amt < 50) {
       triggerToast('Minimum withdrawal is KES 50.', 'error');
       return;
     }
-
     if (amt > balance) {
       triggerToast('Withdrawal exceeds wallet balance.', 'error');
       return;
     }
+    if (isDemoMode) {
+      triggerToast('Withdrawals are unavailable in test mode.', 'error');
+      return;
+    }
+
+    const currentUser = auth?.currentUser;
+    if (!currentUser) {
+      triggerToast('Sign in again before requesting a withdrawal.', 'error');
+      return;
+    }
 
     setLoadingWithdraw(true);
-
     try {
-      const nextBal = balance - amt;
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/withdrawals', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amt }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Withdrawal request failed.');
 
-      setBalance(nextBal);
-      await commitWalletBalance(nextBal);
-
+      setBalance((current) => current - amt);
       setWithdrawAmount('');
       setIsWithdrawModalOpen(false);
-
-      triggerToast(`Withdrawal request submitted: KES ${amt}`, 'success');
-    } catch (e) {
-      triggerToast('Withdrawal failed: ' + getErrorMessage(e), 'error');
+      triggerToast(`Withdrawal queued for admin review: KES ${amt}`, 'success');
+    } catch (error) {
+      triggerToast('Withdrawal failed: ' + getErrorMessage(error), 'error');
     } finally {
       setLoadingWithdraw(false);
     }
   };
 
   const triggerPayoutSequence = (deckName: BetDeckName, multVal: number, activeState: BetDeckState) => {
-    const rawWin = activeState.wager * multVal;
+    const rawWin = Math.min(MAX_PAYOUT, activeState.wager * multVal);
     const resolvedBalance = balance + rawWin;
 
     setBalance(resolvedBalance);
@@ -913,7 +896,7 @@ export default function UltimateJetPesaCockpit() {
 
     if (!targetState.hasBetCurrent) return;
 
-    const preciseWin = targetState.wager * multiplier;
+    const preciseWin = Math.min(MAX_PAYOUT, targetState.wager * multiplier);
     const updatedWallet = balance + preciseWin;
 
     setBalance(updatedWallet);
@@ -968,8 +951,8 @@ export default function UltimateJetPesaCockpit() {
     const amt = parseInt(inputAmount, 10);
     const cleanPhone = inputPhone.trim().replace(/\s+/g, '');
 
-    if (isNaN(amt) || amt < 49) {
-      triggerToast('Minimum deposit is KES 49.', 'error');
+    if (!Number.isInteger(amt) || amt < MIN_DEPOSIT) {
+      triggerToast(`Minimum deposit is KES ${MIN_DEPOSIT}.`, 'error');
       return;
     }
 
@@ -990,13 +973,15 @@ export default function UltimateJetPesaCockpit() {
         const nextBalance = balance + amt; setBalance(nextBalance); await commitWalletBalance(nextBalance);
         if (rememberPhone) localStorage.setItem('jetpesa_saved_phone', cleanPhone);
         setIsDepositModalOpen(false);
-        triggerToast(`Demo funds added: KES ${amt}. No payment was made.`, 'success');
+        triggerToast(`Test funds added: KES ${amt}. No payment was made.`, 'success');
         return;
       }
+      const token = await auth?.currentUser?.getIdToken();
+      if (!token) throw new Error('Login session expired. Please sign in again.');
       const res = await fetch('/api/payhero', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: amt, phone: cleanPhone, username: user.uid }),
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amt, phone: cleanPhone }),
       });
 
       const data = await res.json();
@@ -1018,7 +1003,7 @@ export default function UltimateJetPesaCockpit() {
         attempts += 1;
 
         try {
-          const statusRes = await fetch(`/api/payhero-status?reference=${data.reference}`);
+          const statusRes = await fetch(`/api/payhero-status?reference=${encodeURIComponent(data.reference)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
           const statusData = await statusRes.json();
 
           if (statusData.status === 'completed') {
@@ -1187,7 +1172,7 @@ export default function UltimateJetPesaCockpit() {
         <button onClick={() => handleManualPayoutExecution(name)} className="cashOutButton" style={cashOutButton}>
           CASH OUT
           <br />
-          <span style={{ fontSize: '16px' }}>{(deck.wager * multiplier).toFixed(2)} KES</span>
+          <span style={{ fontSize: '16px' }}>{Math.min(MAX_PAYOUT, deck.wager * multiplier).toFixed(2)} KES</span>
         </button>
       ) : (
         <button
@@ -1231,7 +1216,7 @@ export default function UltimateJetPesaCockpit() {
 
   return (
     <div className="dashboardShell" style={{ background: '#07080e', color: '#f1f5f9', minHeight: '100vh', height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {isDemoMode && <div role="status" className="demoBanner">DEMO MODE · Simulated funds and gameplay · No real money</div>}
+      {isDemoMode && <div role="status" className="demoBanner">TEST MODE · Transactions are disabled</div>}
       <div style={{ position: 'fixed', top: '85px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999, display: 'flex', flexDirection: 'column', gap: '8px', width: '90%', maxWidth: '440px' }}>
         {toasts.map((t) => (
           <div key={t.id} style={{ background: t.type === 'error' ? 'rgba(220,38,38,0.95)' : t.type === 'success' ? 'rgba(22,163,74,0.95)' : 'rgba(30,27,75,0.95)', color: '#fff', padding: '12px 24px', borderRadius: '30px', boxShadow: '0 16px 32px rgba(0,0,0,0.6)', fontWeight: '800', fontSize: '13px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)' }}>
@@ -1242,7 +1227,7 @@ export default function UltimateJetPesaCockpit() {
 
       <header className="dashboardHeader" style={{ background: 'rgba(12,14,24,0.75)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', flexShrink: 0, zIndex: 99 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '-1px', color: '#f8fafc' }}>JETPESA</span>
+          <BrandLogo compact inverted priority />
 
           <button style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: '10px', fontWeight: '800', padding: '3px 10px', borderRadius: '20px', cursor: 'pointer' }} onClick={openProvablyModal}>
             FAIR #{currentRoundRef.current.nonce}
@@ -1446,7 +1431,7 @@ export default function UltimateJetPesaCockpit() {
 
             {isDemoMode && (
               <button type="button" onClick={handleResetDemo} style={{ ...secondaryModalButton, marginTop: '10px' }}>
-                RESET DEMO DATA
+                RESET TEST DATA
               </button>
             )}
 
@@ -1464,7 +1449,8 @@ export default function UltimateJetPesaCockpit() {
             <h3 style={{ margin: '0 0 16px 0', color: '#f59e0b', fontWeight: '900' }}>Withdraw Funds</h3>
 
             <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '14px' }}>
-              Available Balance: <strong style={{ color: '#22c55e' }}>KES {balance.toFixed(2)}</strong>
+              Available balance: <strong style={{ color: '#22c55e' }}>KES {balance.toFixed(2)}</strong><br />
+              Requests are reviewed by an administrator before manual M-Pesa payment.
             </p>
 
             <div style={{ marginBottom: '16px' }}>
@@ -1473,7 +1459,7 @@ export default function UltimateJetPesaCockpit() {
             </div>
 
             <button onClick={handleWithdrawExecution} disabled={loadingWithdraw} style={orangeButton}>
-              {loadingWithdraw ? 'PROCESSING...' : 'WITHDRAW TO M-PESA'}
+              {loadingWithdraw ? 'SUBMITTING...' : 'REQUEST WITHDRAWAL'}
             </button>
           </div>
         </div>
@@ -1492,7 +1478,7 @@ export default function UltimateJetPesaCockpit() {
               <li>Auto Bet repeats a queued stake. Auto Cash Out exits at your selected multiplier.</li>
               <li>Use CANCEL NEXT BET to stop the next automatic stake without affecting the current round.</li>
             </ol>
-            <div style={responsibleNotice}>Demo funds have no monetary value. Set a limit, take breaks, and never chase losses.</div>
+            <div style={responsibleNotice}>Maximum payout is KES 1,000 per round. Gambling involves financial risk. Set a limit, take breaks, and never chase losses.</div>
             <button type="button" onClick={() => setIsHelpModalOpen(false)} style={{ ...secondaryModalButton, marginTop: '16px' }}>GOT IT</button>
           </div>
         </div>

@@ -18,7 +18,7 @@ The platform features:
 
 # Tech Stack
 
-- Next.js 14
+- Next.js 15
 - React
 - Firebase Authentication
 - Firebase Firestore
@@ -87,10 +87,8 @@ MPESA_PASSKEY=
 
 ## 1. Enable Authentication
 
-Enable:
-
-- Email/Password
-- Phone Authentication
+Enable Email/Password and Google authentication. Phone numbers are retained as private
+M-Pesa profile data and are not used as login identifiers.
 
 Inside Firebase Console.
 
@@ -163,7 +161,7 @@ Recommended deployment:
 
 ## Continuous Integration
 
-GitHub Actions installs the locked dependencies and runs a production build for every pull request and every push to `main`. The build uses generated placeholder Firebase credentials; production credentials must only be configured in the deployment platform.
+GitHub Actions installs and audits the locked production dependencies, checks TypeScript, and runs a production build for every pull request and every push to `main`. The build uses generated placeholder Firebase credentials; production credentials must only be configured in the deployment platform.
 
 ## Demo Deployment
 
@@ -184,6 +182,14 @@ For Vercel, set only `NEXT_PUBLIC_DEMO_MODE=true` for the demo project. Use a se
 - The fairness endpoint uses a public demo seed only when demo mode is explicitly enabled.
 - Missing credentials do not automatically enable demo mode.
 
+### MVP game and withdrawal rules
+
+- Published RTP: 90% (10% mathematical house edge).
+- Maximum total payout: KES 1,000 per round.
+- Withdrawals reserve funds immediately and enter manual administrator review.
+- Administrators approve, record manual M-Pesa payment, or reject and refund a request at `/admin/withdrawals`.
+- Configure `ADMIN_EMAILS` with a comma-separated list of authorized Firebase account emails.
+- Configure the public operator name, licence number, privacy email, and support email before launch.
 ### Production gate
 
 The current release is suitable for a product demo, not real-money wagering. Before production, replace client-driven betting, wallet, withdrawal, player, and chat behavior with authenticated server-authoritative services. Verify Firebase ID tokens on every protected API request, validate signed payment callbacks, add idempotency and rate limiting, deploy and test `firestore.rules`, complete legal/compliance review, add monitoring/backups, and run M-Pesa sandbox acceptance tests.

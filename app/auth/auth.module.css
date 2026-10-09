@@ -1,8 +1,6 @@
 .shell { min-height: 100vh; background: var(--bg); color: var(--text); }
 .header { width: min(1080px, calc(100% - 40px)); min-height: 76px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
-.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; }
-.brand > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: var(--brand); color: white; font-size: 11px; font-weight: 800; }
-.brand strong { font-size: 19px; letter-spacing: -.4px; }
+.brand { display: flex; align-items: center; color: var(--text); text-decoration: none; }
 .main { width: min(1080px, calc(100% - 40px)); min-height: calc(100vh - 77px); margin: 0 auto; display: grid; grid-template-columns: 1fr 440px; gap: clamp(60px, 10vw, 130px); align-items: center; padding: 64px 0; }
 .context { max-width: 510px; }
 .eyebrow { margin: 0 0 16px; color: var(--brand); text-transform: uppercase; letter-spacing: .1em; font-size: 12px; font-weight: 750; }
@@ -22,10 +20,16 @@
 .form label { color: var(--text); font-size: 13px; font-weight: 650; }
 .form input { display: block; width: 100%; min-height: 48px; margin-top: 7px; padding: 0 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-size: 15px; }
 .form input::placeholder { color: var(--text-muted); }
+.passwordField { display: grid; }
+.labelRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.resetButton { min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--brand); cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.resetButton:hover { color: var(--brand-hover); text-decoration: underline; }
+.resetButton:disabled { cursor: wait; opacity: .65; }
 .submit { min-height: 48px; margin-top: 4px; border: 0; border-radius: 9px; background: var(--brand); color: white; cursor: pointer; font-weight: 720; }
 .submit:hover { background: var(--brand-hover); }
 .submit:disabled { cursor: wait; opacity: .65; }
 .error { margin-bottom: 16px; padding: 11px 12px; border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); border-radius: 9px; background: color-mix(in srgb, var(--danger) 8%, transparent); color: var(--danger); font-size: 13px; }
+.success { margin-bottom: 16px; padding: 11px 12px; border: 1px solid color-mix(in srgb, var(--positive) 38%, transparent); border-radius: 9px; background: var(--positive-soft); color: var(--positive); font-size: 13px; line-height: 1.45; }
 .googleButton { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 48px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); cursor: pointer; font-size: 14px; font-weight: 700; }
 .googleButton:hover { background: var(--surface-subtle); }
 .googleButton:disabled { cursor: wait; opacity: .65; }

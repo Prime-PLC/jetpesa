@@ -4,7 +4,7 @@ import { getErrorMessage } from '../../../../lib/errors';
 
 export const dynamic = 'force-dynamic';
 
-const HOUSE_EDGE = 0.03;
+const HOUSE_EDGE = 0.10;
 
 function sha256(value: string) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -25,22 +25,10 @@ function normalizeNonce(value: string) {
 }
 
 function calculateCrashPoint(hash: string) {
-  // First 52 bits from hash.
-  const hex52 = hash.slice(0, 13);
-  const h = BigInt(`0x${hex52}`);
-  const e = 2n ** 52n;
-
-  // 3% instant crash house edge.
-  if (h % 33n === 0n) {
-    return 1.0;
-  }
-
-  const numerator = 100n * e - h;
-  const denominator = e - h;
-
-  const result = Number(numerator / denominator) / 100;
-
-  return Math.max(1.0, Math.floor(result * 100) / 100);
+  const h = Number.parseInt(hash.slice(0, 13), 16);
+  const e = 2 ** 52;
+  const result = (1 - HOUSE_EDGE) / (1 - h / e);
+  return Math.max(1, Math.floor(result * 100) / 100);
 }
 
 export async function GET(request: NextRequest) {
